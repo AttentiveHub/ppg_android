@@ -23,14 +23,13 @@ import java.util.*
 class MainActivity: FlutterActivity() {
     private lateinit var api: PolarBleApi
     private val REQUEST_CODE_PERMISSIONS = 101
-    private var deviceId: String? = null
     private lateinit var methodChannel: MethodChannel
     private var scanDisposable: Disposable? = null
     private var connectionStatus = "Disconnected"
 
     private fun startDeviceScan() {
         if (scanDisposable != null && !scanDisposable!!.isDisposed) {
-            scanDisposable!!.dispose(); // This will stop the current scan
+            scanDisposable!!.dispose() // This will stop the current scan
         }
 
         // Start scanning
@@ -62,13 +61,19 @@ class MainActivity: FlutterActivity() {
                         result.success(null)
                     }
                     "connectToDevice" -> {
-                        val deviceId: String? = call.argument("deviceId")
+                        val deviceId : String ? = call.argument("deviceId")
                         deviceId?.let {
                             connectToDevice(it) // Assuming you have a connectToDevice function that takes a device ID
                             result.success(null)
                         } ?: result.error("INVALID_ID", "Device ID is null or invalid.", null)
                     }
-
+                    "disconnectFromDevice" -> {
+                        val deviceId : String ? = call.argument("deviceId")
+                        deviceId?.let {
+                            disconnectFromDevice(it) // Assuming you have a connectToDevice function that takes a device ID
+                            result.success(null)
+                        } ?: result.error("INVALID_ID", "Device ID is null or invalid.", null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -122,6 +127,14 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun disconnectFromDevice(deviceId: String) {
+        try {
+            api.disconnectFromDevice(deviceId)
+        } catch (e: PolarInvalidArgument) {
+            Log.e("MainActivity", "Error disconnecting from device: ${e.message}")
+        }
+    }
+
     private fun initializePolarSDK() {
         api = PolarBleApiDefaultImpl.defaultImplementation(applicationContext, EnumSet.of(
             PolarBleApi.PolarBleSdkFeature.FEATURE_HR,
@@ -140,24 +153,23 @@ class MainActivity: FlutterActivity() {
 
             override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "CONNECTED: ${polarDeviceInfo.deviceId}")
-                deviceId = polarDeviceInfo.deviceId
 
                 connectionStatus = "Connected"
-                sendConnectionStatusToFlutter(connectionStatus)
+                sendConnectionStatusToFlutter(connectionStatus, polarDeviceInfo.deviceId)
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "CONNECTING: ${polarDeviceInfo.deviceId}")
 
                 connectionStatus = "Connecting"
-                sendConnectionStatusToFlutter(connectionStatus)
+                sendConnectionStatusToFlutter(connectionStatus, polarDeviceInfo.deviceId)
             }
 
             override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "DISCONNECTED: ${polarDeviceInfo.deviceId}")
 
                 connectionStatus = "Disconnected"
-                sendConnectionStatusToFlutter(connectionStatus)
+                sendConnectionStatusToFlutter(connectionStatus, polarDeviceInfo.deviceId)
             }
 
             override fun bleSdkFeatureReady(identifier: String, feature: PolarBleApi.PolarBleSdkFeature) {
@@ -180,12 +192,12 @@ class MainActivity: FlutterActivity() {
         })
     }
 
-    private fun sendConnectionStatusToFlutter(status: String) {
+    private fun sendConnectionStatusToFlutter(status: String, deviceId: String) {
         runOnUiThread {
-            methodChannel.invokeMethod(
-                "updateConnectionStatus",
-                status
-            )
+            methodChannel.invokeMethod("updateConnectionStatus", mapOf(
+                    "status" to status,
+                    "deviceId" to deviceId
+            ))
         }
     }
 

@@ -36,6 +36,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final StreamController<List<Map<String, String>>> _devicesStreamController = StreamController.broadcast();
   List<Map<String, String>> _devices = [];
   String? _selectedDeviceId;
+  String? _connectedDeviceId;
   String _connectionStatus = "Disconnected";
 
   @override
@@ -50,18 +51,20 @@ class _MyHomePageState extends State<MyHomePage> {
           _devicesStreamController.add(_devices); // Update the stream with the new list of devices
         });
       } else if (call.method == "updateConnectionStatus") {
-        final String status = call.arguments;
+        final String status = call.arguments["status"];
         setState(() {
+          _connectedDeviceId = status == "Connected" ? call.arguments["deviceId"] : null;
           _connectionStatus = status;
-          // Optionally, show a toast message if you still want user feedback
-          Fluttertoast.showToast(
-            msg: "Connection status: $status",
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.CENTER,
-            timeInSecForIosWeb: 1,
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
+          if (status != "Connecting") {
+            Fluttertoast.showToast(
+              msg: "Connection status: $status",
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.CENTER,
+              timeInSecForIosWeb: 1,
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
+          }
         });
       }
     });
@@ -147,8 +150,18 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void _removeDevice() async {
+    await platform.invokeMethod('disconnectFromDevice', {'deviceId': _connectedDeviceId});
+    setState(() {
+      _connectedDeviceId = null;
+      _connectionStatus = "Disconnected";
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    bool isConnected = _connectionStatus == "Connected";
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -157,16 +170,33 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            ElevatedButton(
-              onPressed: _startScan,
-              child: const Text('Find a Device'),
+            // Use a Row widget to place buttons next to each other
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center, // Center the row content
+              children: <Widget>[
+                ElevatedButton(
+                  onPressed: isConnected ? null : _startScan,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isConnected ? Colors.grey : Colors.blue, // Grey out if connected
+                  ),
+                  child: const Text('Find a Device'),
+                ),
+                const SizedBox(width: 20), // Provide some horizontal spacing between the buttons
+                ElevatedButton(
+                  onPressed: isConnected ? _removeDevice : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isConnected ? Colors.red : Colors.grey, // Grey out if not connected
+                  ),
+                  child: const Text('Unpair Device'),
+                ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Text('Connection Status: $_connectionStatus',
                 style: TextStyle(
                   fontSize: 15,
-                  color: _connectionStatus == "Connected" ? Colors.green : _connectionStatus == "Connecting" ? Colors.orange : Colors.red,
+                  color: isConnected ? Colors.green : _connectionStatus == "Connecting" ? Colors.orange : Colors.red,
                 ),
               ),
             ),
@@ -175,7 +205,6 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
-
 
   @override
   void dispose() {
