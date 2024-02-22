@@ -36,6 +36,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final StreamController<List<Map<String, String>>> _devicesStreamController = StreamController.broadcast();
   List<Map<String, String>> _devices = [];
   String? _selectedDeviceId;
+  String _connectionStatus = "Disconnected";
 
   @override
   void initState() {
@@ -48,16 +49,20 @@ class _MyHomePageState extends State<MyHomePage> {
           _devices.add({"deviceId": deviceId, "name": name});
           _devicesStreamController.add(_devices); // Update the stream with the new list of devices
         });
-      } else if (call.method == "onDeviceConnected") {
-        Fluttertoast.showToast(
-          msg: "Device successfully connected!",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 1,
-          backgroundColor: Colors.green,
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
+      } else if (call.method == "updateConnectionStatus") {
+        final String status = call.arguments;
+        setState(() {
+          _connectionStatus = status;
+          // Optionally, show a toast message if you still want user feedback
+          Fluttertoast.showToast(
+            msg: "Connection status: $status",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.CENTER,
+            timeInSecForIosWeb: 1,
+            textColor: Colors.white,
+            fontSize: 16.0,
+          );
+        });
       }
     });
   }
@@ -149,13 +154,28 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: ElevatedButton(
-          onPressed: _startScan,
-          child: const Text('Find a Device'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            ElevatedButton(
+              onPressed: _startScan,
+              child: const Text('Find a Device'),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Text('Connection Status: $_connectionStatus',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: _connectionStatus == "Connected" ? Colors.green : _connectionStatus == "Connecting" ? Colors.orange : Colors.red,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+
 
   @override
   void dispose() {

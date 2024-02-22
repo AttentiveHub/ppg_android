@@ -6,17 +6,15 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import io.flutter.embedding.android.FlutterActivity
 import com.polar.sdk.api.PolarBleApi
 import com.polar.sdk.api.PolarBleApiCallback
 import com.polar.sdk.api.PolarBleApiDefaultImpl
-import com.polar.sdk.api.model.PolarDeviceInfo
 import com.polar.sdk.api.errors.PolarInvalidArgument
+import com.polar.sdk.api.model.PolarDeviceInfo
 import com.polar.sdk.api.model.PolarPpgData
-import com.polar.sdk.api.model.PolarSensorSetting
+import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
@@ -28,6 +26,7 @@ class MainActivity: FlutterActivity() {
     private var deviceId: String? = null
     private lateinit var methodChannel: MethodChannel
     private var scanDisposable: Disposable? = null
+    private var connectionStatus = "Disconnected"
 
     private fun startDeviceScan() {
         if (scanDisposable != null && !scanDisposable!!.isDisposed) {
@@ -143,18 +142,22 @@ class MainActivity: FlutterActivity() {
                 Log.d("MyApp", "CONNECTED: ${polarDeviceInfo.deviceId}")
                 deviceId = polarDeviceInfo.deviceId
 
-                // Notify Flutter about the successful connection
-                runOnUiThread {
-                    methodChannel.invokeMethod("onDeviceConnected", null)
-                }
+                connectionStatus = "Connected"
+                sendConnectionStatusToFlutter(connectionStatus)
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "CONNECTING: ${polarDeviceInfo.deviceId}")
+
+                connectionStatus = "Connecting"
+                sendConnectionStatusToFlutter(connectionStatus)
             }
 
             override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "DISCONNECTED: ${polarDeviceInfo.deviceId}")
+
+                connectionStatus = "Disconnected"
+                sendConnectionStatusToFlutter(connectionStatus)
             }
 
             override fun bleSdkFeatureReady(identifier: String, feature: PolarBleApi.PolarBleSdkFeature) {
@@ -163,7 +166,7 @@ class MainActivity: FlutterActivity() {
                 if (feature == PolarBleApi.PolarBleSdkFeature.FEATURE_POLAR_ONLINE_STREAMING) {
                     // Start PPG streaming
                     enableSDKMode(identifier)
-                    startPPGStreaming(identifier)
+//                    startPPGStreaming(identifier)
                 }
             }
 
@@ -175,6 +178,15 @@ class MainActivity: FlutterActivity() {
                 Log.d("MyApp", "BATTERY LEVEL: $level")
             }
         })
+    }
+
+    private fun sendConnectionStatusToFlutter(status: String) {
+        runOnUiThread {
+            methodChannel.invokeMethod(
+                "updateConnectionStatus",
+                status
+            )
+        }
     }
 
     @SuppressLint("CheckResult")
