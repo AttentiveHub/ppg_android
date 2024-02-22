@@ -1,0 +1,45 @@
+# General
+.DS_Store
+*.swp
+*.lock
+*.bak
+*.tmp
+*.log
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.buildlog
+.pub/
+build/
+
+# Android
+**/build/
+**/local.properties
+**/.idea/
+**/.gradle/
+**/*.iml
+.gradle
+*.keystore
+
+# iOS (in case you have iOS code as well)
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/GeneratedPluginRegistrant.*
+**/ios/Flutter/podhelper.rb
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/Debug.xcconfig
+**/ios/Flutter/Release.xcconfig
+**/ios/.generated/
+**/ios/Flutter/.last_build_id
+**/ios/Pods/
+**/ios/Podfile.lock
+**/ios/Podfile
+**/ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
