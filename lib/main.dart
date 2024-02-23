@@ -39,9 +39,17 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _selectedDeviceId;
   String? _connectedDeviceId;
   String _connectionStatus = "Disconnected";
-  final List<String> _channels = ['HR', 'ACC', 'ECG', 'GYR', 'PPG', 'PPI', 'MAG'];
+  final List<String> _channels = ['HR ', 'ECG', 'ACC', 'PPG', 'PPI', 'Gyro', 'Magnetometer'];
   List<int> _selectedChannelIndices = [];
   bool _channelsConfirmed = false; // Tracks whether the selection has been confirmed
+  final int _maxChannels = 3;
+  String hrData = '';
+  String ecgData = '';
+  String accData = '';
+  String ppgData = '';
+  String ppiData = '';
+  String gyroData = '';
+  String magData = '';
 
   @override
   void initState() {
@@ -69,6 +77,34 @@ class _MyHomePageState extends State<MyHomePage> {
               fontSize: 16.0,
             );
           }
+        });
+      } else if (call.method == "onHRDataReceived") {
+        setState(() {
+          hrData = call.arguments;
+        });
+      } else if (call.method == "onECGDataReceived") {
+        setState(() {
+          ecgData = call.arguments;
+        });
+      } else if (call.method == "onACCDataReceived") {
+        setState(() {
+          accData = call.arguments;
+        });
+      } else if (call.method == "onGyrDataReceived") {
+        setState(() {
+          gyroData = call.arguments;
+        });
+      } else if (call.method == "onMagDataReceived") {
+        setState(() {
+          magData = call.arguments;
+        });
+      } else if (call.method == "onPPGDataReceived") {
+        setState(() {
+          ppgData = call.arguments;
+        });
+      } else if (call.method == "onPPIDataReceived") {
+        setState(() {
+          ppiData = call.arguments;
         });
       }
     });
@@ -166,7 +202,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return InkWell(
       onTap: () {
         // Check if the condition to allow interaction is met
-        if (!_channelsConfirmed && (isSelected || _selectedChannelIndices.length < 4)) {
+        if (!_channelsConfirmed && (isSelected || _selectedChannelIndices.length < _maxChannels)) {
           setState(() {
             if (isSelected) {
               _selectedChannelIndices.remove(index);
@@ -177,7 +213,7 @@ class _MyHomePageState extends State<MyHomePage> {
         } else if(_channelsConfirmed) {
           // Show a warning message if the condition is not met
           Fluttertoast.showToast(
-            msg: "You have to reset to edit choices.",
+            msg: "Reset to edit choices.",
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER,
             timeInSecForIosWeb: 1,
@@ -188,7 +224,7 @@ class _MyHomePageState extends State<MyHomePage> {
         } else {
           // Show a warning message if the condition is not met
           Fluttertoast.showToast(
-            msg: "You cannot choose more than 4 channels.",
+            msg: "Cannot choose more than $_maxChannels channels.",
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER,
             timeInSecForIosWeb: 1,
@@ -224,7 +260,7 @@ class _MyHomePageState extends State<MyHomePage> {
         Padding(
           padding: const EdgeInsets.only(top: 40.0, bottom: 12.0), // Add some space below the heading
           child: Text(
-            'Choose Your Channels:',
+            'Choose Channels',
             style: Theme.of(context).textTheme.titleLarge, // Styling for the heading
           ),
         ),
@@ -248,10 +284,11 @@ class _MyHomePageState extends State<MyHomePage> {
       children: [
         ElevatedButton(
           onPressed: !_channelsConfirmed && _selectedChannelIndices.isNotEmpty ? () {
+            final selectedChannels = _selectedChannelIndices.map((index) => _channels[index]).toList();
+            platform.invokeMethod('startListeningToChannels', selectedChannels);
             setState(() {
               _channelsConfirmed = true; // Confirm selection
             });
-            // Optionally: Invoke logic to handle confirmed selection here
           } : null, // Disable button if conditions are not met
           style: ElevatedButton.styleFrom(
             backgroundColor: !_channelsConfirmed && _selectedChannelIndices.isNotEmpty ? Colors.greenAccent : Colors.grey, // Color when disabled
@@ -264,9 +301,18 @@ class _MyHomePageState extends State<MyHomePage> {
         const SizedBox(width: 20), // Space between buttons
         ElevatedButton(
           onPressed: _channelsConfirmed ? () {
+            platform.invokeMethod('stopListeningToChannels');
             setState(() {
               _channelsConfirmed = false; // Reset confirmation
               _selectedChannelIndices.clear(); // Clear selections
+              hrData = "";
+              ecgData = "";
+              accData = "";
+              ppgData = "";
+              ppiData = "";
+              gyroData = "";
+              hrData = "";
+              magData = "";
             });
           } : null, // Disable button if conditions are not met
           style: ElevatedButton.styleFrom(
@@ -280,7 +326,6 @@ class _MyHomePageState extends State<MyHomePage> {
       ],
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -342,6 +387,44 @@ class _MyHomePageState extends State<MyHomePage> {
             const Padding(
                 padding: EdgeInsets.only(top: 16.0, bottom: 0.0)),
             _buildConfirmResetButtons(),
+            const Padding(
+                padding: EdgeInsets.only(top: 16.0, bottom: 0.0)),
+            SingleChildScrollView(
+              child: Column(
+                children: <Widget>[
+                  // Your existing widgets here...
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("HR Data: $hrData"),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("ECG Data: $ecgData"),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("ACC Data: $accData"),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("PPG Data: $ppgData"),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("PPI Data: $ppiData"),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("Gyro Data: $gyroData"),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("Mag Data: $magData"),
+                  ),
+                  // Add Text widgets for other channels as needed
+                ],
+              ),
+            ),
           ],
         ),
       ),
