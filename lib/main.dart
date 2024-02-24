@@ -1,11 +1,24 @@
 import 'dart:async'; // Import async library for StreamController
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:provider/provider.dart';
+
+import 'ChannelSelectionModel.dart';
+import 'dataPage.dart';
+import 'graphPage.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ChannelSelectionModel(),
+      child: const MyApp(),
+    ),
+  );
+
+  // runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -19,7 +32,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         primaryColor: Colors.green,
       ),
-      home: const MyHomePage(title: 'Polar Logger2 Page'),
+      home: const MyHomePage(title: '',),
     );
   }
 }
@@ -35,12 +48,12 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final MethodChannel platform = const MethodChannel('com.attentive_hub.polar_ppg');
   final StreamController<List<Map<String, String>>> _devicesStreamController = StreamController.broadcast();
-  List<Map<String, String>> _devices = [];
+  final List<Map<String, String>> _devices = [];
   String? _selectedDeviceId;
   String? _connectedDeviceId;
   String _connectionStatus = "Disconnected";
   final List<String> _channels = ['HR ', 'ECG', 'ACC', 'PPG', 'PPI', 'Gyro', 'Magnetometer'];
-  List<int> _selectedChannelIndices = [];
+  final List<int> _selectedChannelIndices = [];
   bool _channelsConfirmed = false; // Tracks whether the selection has been confirmed
   final int _maxChannels = 3;
   String hrData = '';
@@ -54,6 +67,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    debugPrint("Setting up MethodChannel");
     platform.setMethodCallHandler((call) async {
       if (call.method == "onDeviceFound") {
         final String deviceId = call.arguments["deviceId"];
@@ -202,7 +216,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return InkWell(
       onTap: () {
         // Check if the condition to allow interaction is met
-        if (!_channelsConfirmed && (isSelected || _selectedChannelIndices.length < _maxChannels)) {
+        if (!_channelsConfirmed && (isSelected || _selectedChannelIndices.length < _maxChannels) && _connectionStatus == "Connected") {
           setState(() {
             if (isSelected) {
               _selectedChannelIndices.remove(index);
@@ -210,6 +224,17 @@ class _MyHomePageState extends State<MyHomePage> {
               _selectedChannelIndices.add(index);
             }
           });
+        } else if(_connectionStatus != "Connected") {
+          // Show a warning message if the condition is not met
+          Fluttertoast.showToast(
+            msg: "Pair with a sensor first.",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.CENTER,
+            timeInSecForIosWeb: 1,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+            fontSize: 16.0,
+          );
         } else if(_channelsConfirmed) {
           // Show a warning message if the condition is not met
           Fluttertoast.showToast(
@@ -285,6 +310,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ElevatedButton(
           onPressed: !_channelsConfirmed && _selectedChannelIndices.isNotEmpty ? () {
             final selectedChannels = _selectedChannelIndices.map((index) => _channels[index]).toList();
+            // Provider.of<ChannelSelectionModel>(context, listen: false).setSelectedChannels(selectedChannels);
             platform.invokeMethod('startListeningToChannels', selectedChannels);
             setState(() {
               _channelsConfirmed = true; // Confirm selection
@@ -301,6 +327,7 @@ class _MyHomePageState extends State<MyHomePage> {
         const SizedBox(width: 20), // Space between buttons
         ElevatedButton(
           onPressed: _channelsConfirmed ? () {
+            // Provider.of<ChannelSelectionModel>(context, listen: false).resetChannels();
             platform.invokeMethod('stopListeningToChannels');
             setState(() {
               _channelsConfirmed = false; // Reset confirmation
@@ -437,3 +464,48 @@ class _MyHomePageState extends State<MyHomePage> {
     _devicesStreamController.close(); // Close the stream controller to prevent memory leaks
   }
 }
+
+// New MainPage widget
+// class MainPage extends StatefulWidget {
+//   const MainPage({Key? key}) : super(key: key);
+//
+//   @override
+//   _MainPageState createState() => _MainPageState();
+// }
+//
+// class _MainPageState extends State<MainPage> {
+//   int _selectedIndex = 0;
+//
+//   final List<Widget> _pages = [
+//     const MyHomePage(title: 'Home'), // Assuming MyHomePage is your home page
+//     const DataPage(), // Create this widget for displaying data
+//     const GraphPage(), // Placeholder widget for future graph functionalities
+//   ];
+//
+//   void _onItemTapped(int index) {
+//     setState(() {
+//       _selectedIndex = index;
+//     });
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       body: IndexedStack(
+//         index: _selectedIndex,
+//         children: _pages,
+//       ),
+//       bottomNavigationBar: BottomNavigationBar(
+//         items: const [
+//           BottomNavigationBarItem(icon: Icon(Icons.radio_button_checked), label: 'Configure'),
+//           BottomNavigationBarItem(icon: Icon(Icons.monitor_heart_outlined), label: 'Data'),
+//           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Graphs'),
+//         ],
+//         currentIndex: _selectedIndex,
+//         onTap: _onItemTapped,
+//         selectedItemColor: Colors.greenAccent,
+//         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+//       ),
+//     );
+//   }
+// }

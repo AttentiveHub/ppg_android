@@ -232,7 +232,7 @@ class MainActivity: FlutterActivity() {
 
     private fun startListeningToChannels(channels: List<String>?) {
         channels?.forEach { channel ->
-//            connectedDevice?.let { enableSDKMode(it) }
+            connectedDevice?.let { enableSDKMode(it) }
             when (channel) {
                 "HR " -> startHRStreaming()
                 "ECG" -> startECGStreaming()
