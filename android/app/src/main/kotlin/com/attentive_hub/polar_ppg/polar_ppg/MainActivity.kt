@@ -32,10 +32,14 @@ class MainActivity: FlutterActivity() {
     private lateinit var api: PolarBleApi
     private val requestCodePermissions = 101
     private lateinit var methodChannel: MethodChannel
+    private val tag = "PPG LEGO"
+
     private var scanDisposable: Disposable? = null
     private var connectionStatus = "Disconnected"
     private var connectedDevice: String? = null
-    private val tag = "PPG LEGGO"
+
+    private var SDKMode: Boolean = false
+    private var record: Boolean = false
 
     private var hrDisposable: Disposable? = null
     private var ecgDisposable: Disposable? = null
@@ -92,6 +96,14 @@ class MainActivity: FlutterActivity() {
                             disconnectFromDevice(it) // Assuming you have a connectToDevice function that takes a device ID
                             result.success(null)
                         } ?: result.error("INVALID_ID", "Device ID is null or invalid.", null)
+                    }
+                    "toggleSDKMode" -> {
+                        toggleSDKMode()
+                        result.success(null)
+                    }
+                    "toggleRecord" -> {
+                        toggleRecord()
+                        result.success(null)
                     }
                     "startListeningToChannels" -> {
                         val channels: List<String>? = call.arguments()
@@ -203,12 +215,6 @@ class MainActivity: FlutterActivity() {
 
             override fun bleSdkFeatureReady(identifier: String, feature: PolarBleApi.PolarBleSdkFeature) {
                 Log.d("MyApp", "Polar BLE SDK feature $feature is ready")
-
-//                if (feature == PolarBleApi.PolarBleSdkFeature.FEATURE_POLAR_ONLINE_STREAMING) {
-//                    // Start PPG streaming
-//                    enableSDKMode(identifier)
-//                    startPPGStreaming(identifier)
-//                }
             }
 
             override fun disInformationReceived(identifier: String, uuid: UUID, value: String) {
@@ -230,9 +236,49 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun toggleSDKMode() {
+        if(SDKMode) {
+            connectedDevice?.let { disableSDKMode(it) }
+
+        } else {
+            connectedDevice?.let { enableSDKMode(it) }
+        }
+    }
+
+    private fun toggleRecord() {
+//        TODO
+    }
+
+    @SuppressLint("CheckResult")
+    private fun disableSDKMode(deviceId: String) {
+        api.enableSDKMode(deviceId)
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
+                {
+                    Log.d(tag, "SDK mode disabled")
+                },
+                {
+                    Log.e(tag, "SDKMode err")
+                }
+            )
+    }
+
+    @SuppressLint("CheckResult")
+    private fun enableSDKMode(deviceId: String) {
+        api.enableSDKMode(deviceId)
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
+                {
+                    Log.d(tag, "SDK mode enabled")
+                },
+                {
+                    Log.e(tag, "SDKMode err")
+                }
+            )
+    }
+
     private fun startListeningToChannels(channels: List<String>?) {
         channels?.forEach { channel ->
-            connectedDevice?.let { enableSDKMode(it) }
             when (channel) {
                 "HR " -> startHRStreaming()
                 "ECG" -> startECGStreaming()
@@ -430,24 +476,6 @@ class MainActivity: FlutterActivity() {
                 )
         }
         ppiDisposable?.let { streamingDisposables.add(it) }
-    }
-
-    @SuppressLint("CheckResult")
-    private fun enableSDKMode(deviceId: String){
-        api.enableSDKMode(deviceId)
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe(
-                {
-                    Log.d(tag, "SDK mode enabled")
-                    // at this point dispose all existing streams. SDK mode enable command
-                    // stops all the streams but client is not informed. This is workaround
-                    // for the bug.
-//                    disposeAllStreams()
-                },
-                {
-                    Log.e(tag, "sdkmode err")
-                }
-            )
     }
 
     override fun onDestroy() {
