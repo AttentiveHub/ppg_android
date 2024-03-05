@@ -13,7 +13,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final MethodChannel platform = const MethodChannel('com.attentive_hub.polar_ppg');
+  final MethodChannel platform = const MethodChannel('com.attentive_hub.polar_ppg.main');
 
   final StreamController<List<Map<String, String>>> _devicesStreamController = StreamController.broadcast();
   final List<Map<String, String>> _devices = [];
@@ -21,21 +21,13 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _connectedDeviceId;
   String _connectionStatus = "Disconnected";
 
-  final List<String> _channels = ['HR ', 'ECG', 'ACC', 'PPG', 'PPI', 'Gyro',];// 'Magnetometer'];
+  final List<String> _channels = ['HR  ', 'ECG', 'ACC', 'PPG', 'PPI ', 'Gyro',];// 'Magnetometer'];
   final List<int> _selectedChannelIndices = [];
   bool _channelsConfirmed = false; // Tracks whether the selection has been confirmed
   final int _maxChannels = 3;
 
   bool _isSdkEnabled = false;
   bool _isRecordingEnabled = false;
-
-  String hrData = '';
-  String ecgData = '';
-  String accData = '';
-  String ppgData = '';
-  String ppiData = '';
-  String gyroData = '';
-  String magData = '';
 
   @override
   void initState() {
@@ -63,34 +55,6 @@ class _MyHomePageState extends State<MyHomePage> {
               fontSize: 16.0,
             );
           }
-        });
-      } else if (call.method == "onHRDataReceived") {
-        setState(() {
-          hrData = call.arguments;
-        });
-      } else if (call.method == "onECGDataReceived") {
-        setState(() {
-          ecgData = call.arguments;
-        });
-      } else if (call.method == "onACCDataReceived") {
-        setState(() {
-          accData = call.arguments;
-        });
-      } else if (call.method == "onGyrDataReceived") {
-        setState(() {
-          gyroData = call.arguments;
-        });
-      } else if (call.method == "onMagDataReceived") {
-        setState(() {
-          magData = call.arguments;
-        });
-      } else if (call.method == "onPPGDataReceived") {
-        setState(() {
-          ppgData = call.arguments;
-        });
-      } else if (call.method == "onPPIDataReceived") {
-        setState(() {
-          ppiData = call.arguments;
         });
       }
     });
@@ -167,7 +131,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-
   void _pairDevice() async {
     if (_selectedDeviceId != null) {
       await platform.invokeMethod('connectToDevice', {'deviceId': _selectedDeviceId});
@@ -189,7 +152,7 @@ class _MyHomePageState extends State<MyHomePage> {
       onTap: () {
         // Check if the condition to allow interaction is met
         if (!_channelsConfirmed && (isSelected || _selectedChannelIndices.length < _maxChannels) && _connectionStatus == "Connected") {
-          if ((_channels[index] != 'PPI' && _channels[index] != 'HR ' && _channels[index] != 'ECG') || !_isSdkEnabled){
+          if ((_channels[index] != 'PPI ' && _channels[index] != 'HR  ' && _channels[index] != 'ECG') || !_isSdkEnabled){
             setState(() {
               if (isSelected) {
                 _selectedChannelIndices.remove(index);
@@ -269,14 +232,14 @@ class _MyHomePageState extends State<MyHomePage> {
         Padding(
           padding: const EdgeInsets.only(top: 20.0, bottom: 12.0), // Add some space below the heading
           child: Text(
-            'Choose Channels',
+            'Channel Selection',
             style: Theme.of(context).textTheme.titleLarge, // Styling for the heading
           ),
         ),
         Padding( // Apply padding to the Wrap widget to align it with the title
           padding: const EdgeInsets.only(right: 25.0),
           child: Wrap(
-            spacing: 20.0, // Horizontal space between buttons
+            spacing: 50.0, // Horizontal space between buttons
             runSpacing: 5.0, // Vertical space between lines
             children: List<Widget>.generate(_channels.length, (index) {
               return _buildSelectableChannel(index);
@@ -294,7 +257,7 @@ class _MyHomePageState extends State<MyHomePage> {
         style: TextStyle(fontWeight: FontWeight.bold), // Make text bold
       ),
       value: _isSdkEnabled,
-      onChanged: _channelsConfirmed || _selectedChannelIndices.any((index) => ['ppi', 'hr ', 'ecg'].contains(_channels[index].toLowerCase())) ? null : (bool value) {
+      onChanged: _channelsConfirmed || _selectedChannelIndices.any((index) => ['PPI ', 'HR  ', 'ECG'].contains(_channels[index])) ? null : (bool value) {
         setState(() {
           _isSdkEnabled = value;
         });
@@ -330,7 +293,6 @@ class _MyHomePageState extends State<MyHomePage> {
         ElevatedButton(
           onPressed: !_channelsConfirmed && _selectedChannelIndices.isNotEmpty ? () {
             final selectedChannels = _selectedChannelIndices.map((index) => _channels[index]).toList();
-            // Provider.of<ChannelSelectionModel>(context, listen: false).setSelectedChannels(selectedChannels);
             if (_isSdkEnabled) {
               platform.invokeMethod("toggleSDKMode");
             }
@@ -354,19 +316,18 @@ class _MyHomePageState extends State<MyHomePage> {
         const SizedBox(width: 20), // Space between buttons
         ElevatedButton(
           onPressed: _channelsConfirmed ? () {
-            // Provider.of<ChannelSelectionModel>(context, listen: false).resetChannels();
             platform.invokeMethod('stopListeningToChannels').then((_) {
               setState(() {
                 _channelsConfirmed = false; // Reset confirmation
                 _selectedChannelIndices.clear(); // Clear selections
-                hrData = "";
-                ecgData = "";
-                accData = "";
-                ppgData = "";
-                ppiData = "";
-                gyroData = "";
-                hrData = "";
-                magData = "";
+                // hrData = "";
+                // ecgData = "";
+                // accData = "";
+                // ppgData = "";
+                // ppiData = "";
+                // gyroData = "";
+                // hrData = "";
+                // magData = "";
               });
             });
           } : null, // Disable button if conditions are not met
@@ -437,51 +398,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
             ),
+            const Padding(padding: EdgeInsets.only(top: 60.0, bottom: 0.0)),
             _buildChannelSelectionGrid(),
-            const Padding(padding: EdgeInsets.only(top: 8.0, bottom: 0.0)),
+            const Padding(padding: EdgeInsets.only(top: 60.0, bottom: 0.0)),
             _buildSDKToggle(),
+            // const Padding(padding: EdgeInsets.only(top: 20.0, bottom: 0.0)),
             _buildRecordToggle(),
-            const Padding(padding: EdgeInsets.only(top: 8.0, bottom: 0.0)),
+            const Padding(padding: EdgeInsets.only(top: 60.0, bottom: 0.0)),
             _buildConfirmResetButtons(),
-            const Padding(padding: EdgeInsets.only(top: 16.0, bottom: 0.0)),
-            Expanded(
-              child:SingleChildScrollView(
-                child: Column(
-                  children: <Widget>[
-                    // Your existing widgets here...
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("HR Data: $hrData"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("ECG Data: $ecgData"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("ACC Data: $accData"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("PPG Data: $ppgData"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("PPI Data: $ppiData"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("Gyro Data: $gyroData"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("Mag Data: $magData"),
-                    ),
-                    // Add Text widgets for other channels as needed
-                  ],
-                ),
-              ),
-            )
           ],
         ),
       ),

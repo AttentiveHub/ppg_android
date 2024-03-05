@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import 'ChannelSelectionModel.dart';
 import 'dataPage.dart';
 import 'graphPage.dart';
 import 'homePage.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => ChannelSelectionModel(),
-      child: const MyApp(),
-    ),
-  );
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -44,7 +37,7 @@ class _MainPageState extends State<MainPage> {
 
   final List<Widget> _pages = [
     const MyHomePage(title: 'Home'), // Assuming MyHomePage is your home page
-    // const DataPage(), // Create this widget for displaying data
+    const DataPage(), // Create this widget for displaying data
     const GraphPage(), // Placeholder widget for future graph functionalities
   ];
 

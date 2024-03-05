@@ -31,7 +31,8 @@ import java.util.*
 class MainActivity: FlutterActivity() {
     private lateinit var api: PolarBleApi
     private val requestCodePermissions = 101
-    private lateinit var methodChannel: MethodChannel
+    private lateinit var mainMethodChannel: MethodChannel
+    private lateinit var dataMethodChannel: MethodChannel
     private val tag = "PPG LEGO"
 
     private var scanDisposable: Disposable? = null
@@ -59,7 +60,7 @@ class MainActivity: FlutterActivity() {
         scanDisposable = api.searchForDevice().observeOn(AndroidSchedulers.mainThread()).subscribe(
             { polarDeviceInfo ->
                 // Device found, send information to Flutter
-                methodChannel.invokeMethod("onDeviceFound", mapOf(
+                mainMethodChannel.invokeMethod("onDeviceFound", mapOf(
                     "deviceId" to polarDeviceInfo.deviceId,
                     "name" to polarDeviceInfo.name
                 ))
@@ -74,10 +75,11 @@ class MainActivity: FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        methodChannel = flutterEngine?.dartExecutor?.binaryMessenger?.let { MethodChannel(it, "com.attentive_hub.polar_ppg") }!!
+        mainMethodChannel = flutterEngine?.dartExecutor?.binaryMessenger?.let { MethodChannel(it, "com.attentive_hub.polar_ppg.main") }!!
+        dataMethodChannel = flutterEngine?.dartExecutor?.binaryMessenger?.let { MethodChannel(it, "com.attentive_hub.polar_ppg.data") }!!
 
         flutterEngine?.dartExecutor?.let { it ->
-            MethodChannel(it.binaryMessenger, "com.attentive_hub.polar_ppg").setMethodCallHandler { call, result ->
+            MethodChannel(it.binaryMessenger, "com.attentive_hub.polar_ppg.main").setMethodCallHandler { call, result ->
                 when (call.method) {
                     "startScan" -> {
                         startDeviceScan()
@@ -229,7 +231,7 @@ class MainActivity: FlutterActivity() {
 
     private fun sendConnectionStatusToFlutter(status: String, deviceId: String) {
         runOnUiThread {
-            methodChannel.invokeMethod("updateConnectionStatus", mapOf(
+            mainMethodChannel.invokeMethod("updateConnectionStatus", mapOf(
                     "status" to status,
                     "deviceId" to deviceId
             ))
@@ -293,6 +295,7 @@ class MainActivity: FlutterActivity() {
 
     private fun stopListeningToChannels() {
         streamingDisposables.clear() // Stop all streams
+        dataMethodChannel.invokeMethod("resetChannels", null)
     }
 
     private fun startHRStreaming() {
@@ -307,7 +310,7 @@ class MainActivity: FlutterActivity() {
                             log = "HR     bpm: ${sample.hr} rrs: ${sample.rrsMs} rrAvailable: ${sample.rrAvailable} contactStatus: ${sample.contactStatus} contactStatusSupported: ${sample.contactStatusSupported}"
                             Log.d(tag, log)
                         }
-                        methodChannel.invokeMethod("onHRDataReceived", log)
+                        dataMethodChannel.invokeMethod("onHRDataReceived", log)
                     },
                     { error ->
                         Log.e(tag, "HR stream failed: $error")
@@ -334,7 +337,7 @@ class MainActivity: FlutterActivity() {
                             log = "    yV: ${data.voltage} timeStamp: ${data.timeStamp}"
                             Log.d(tag, log)
                         }
-                        methodChannel.invokeMethod("onECGDataReceived", log)
+                        dataMethodChannel.invokeMethod("onECGDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "ECG stream failed. Reason $error")
@@ -361,7 +364,7 @@ class MainActivity: FlutterActivity() {
                             log = "ACC    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
                             Log.d(tag, log)
                         }
-                        methodChannel.invokeMethod("onACCDataReceived", log)
+                        dataMethodChannel.invokeMethod("onACCDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "ACC stream failed. Reason $error")
@@ -388,7 +391,7 @@ class MainActivity: FlutterActivity() {
                             log = "GYR    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
                             Log.d(tag, log)
                         }
-                        methodChannel.invokeMethod("onGyrDataReceived", log)
+                        dataMethodChannel.invokeMethod("onGyrDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Gyro stream failed. Reason $error")
@@ -415,7 +418,7 @@ class MainActivity: FlutterActivity() {
                             log = "MAG    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
                             Log.d(tag, log)
                         }
-                        methodChannel.invokeMethod("onMagDataReceived", log)
+                        dataMethodChannel.invokeMethod("onMagDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Mag stream failed. Reason $error")
@@ -444,7 +447,7 @@ class MainActivity: FlutterActivity() {
                                 Log.d(tag, log)
                             }
                         }
-                        methodChannel.invokeMethod("onPPGDataReceived", log)
+                        dataMethodChannel.invokeMethod("onPPGDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Ppg stream failed. Reason $error")
@@ -467,7 +470,7 @@ class MainActivity: FlutterActivity() {
                             log = "PPI    ppi: ${sample.ppi} blocker: ${sample.blockerBit} errorEstimate: ${sample.errorEstimate}"
                             Log.d(tag, log)
                         }
-                        methodChannel.invokeMethod("onPPIDataReceived", log)
+                        dataMethodChannel.invokeMethod("onPPIDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Ppi stream failed. Reason $error")
