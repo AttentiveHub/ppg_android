@@ -43,3 +43,4 @@ build/
 **/ios/Podfile.lock
 **/ios/Podfile
 **/ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+/devtools_options.yaml
