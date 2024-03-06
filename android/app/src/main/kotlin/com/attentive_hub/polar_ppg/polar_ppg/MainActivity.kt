@@ -1,8 +1,9 @@
 package com.attentive_hub.polar_ppg.polar_ppg
 
 import android.Manifest
-import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -11,66 +12,22 @@ import androidx.core.content.ContextCompat
 import com.polar.sdk.api.PolarBleApi
 import com.polar.sdk.api.PolarBleApiCallback
 import com.polar.sdk.api.PolarBleApiDefaultImpl
-import com.polar.sdk.api.errors.PolarInvalidArgument
-import com.polar.sdk.api.model.PolarAccelerometerData
 import com.polar.sdk.api.model.PolarDeviceInfo
-import com.polar.sdk.api.model.PolarEcgData
-import com.polar.sdk.api.model.PolarGyroData
-import com.polar.sdk.api.model.PolarHrData
-import com.polar.sdk.api.model.PolarMagnetometerData
-import com.polar.sdk.api.model.PolarPpgData
-import com.polar.sdk.api.model.PolarPpiData
-import com.polar.sdk.api.model.PolarSensorSetting
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.disposables.Disposable
 import java.util.*
 
 class MainActivity: FlutterActivity() {
     private lateinit var api: PolarBleApi
+    private lateinit var deviceId: String
+    private lateinit var streamManager: StreamManager
+    private lateinit var bluetoothManager: BluetoothManager
+
     private val requestCodePermissions = 101
+    private val requestCodeDirectory = 102
+
     private lateinit var mainMethodChannel: MethodChannel
     private lateinit var dataMethodChannel: MethodChannel
-    private val tag = "PPG LEGO"
-
-    private var scanDisposable: Disposable? = null
-    private var connectionStatus = "Disconnected"
-    private var connectedDevice: String? = null
-
-    private var SDKMode: Boolean = false
-    private var record: Boolean = false
-
-    private var hrDisposable: Disposable? = null
-    private var ecgDisposable: Disposable? = null
-    private var accDisposable: Disposable? = null
-    private var ppgDisposable: Disposable? = null
-    private var ppiDisposable: Disposable? = null
-    private var gyrDisposable: Disposable? = null
-    private var magDisposable: Disposable? = null
-    private var streamingDisposables = CompositeDisposable()
-
-    private fun startDeviceScan() {
-        if (scanDisposable != null && !scanDisposable!!.isDisposed) {
-            scanDisposable!!.dispose() // This will stop the current scan
-        }
-
-        // Start scanning
-        scanDisposable = api.searchForDevice().observeOn(AndroidSchedulers.mainThread()).subscribe(
-            { polarDeviceInfo ->
-                // Device found, send information to Flutter
-                mainMethodChannel.invokeMethod("onDeviceFound", mapOf(
-                    "deviceId" to polarDeviceInfo.deviceId,
-                    "name" to polarDeviceInfo.name
-                ))
-                Log.d(tag, polarDeviceInfo.deviceId)
-            },
-            { throwable ->
-                Log.e("MainActivity", "Device scan error: $throwable")
-            }
-        )
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,45 +39,46 @@ class MainActivity: FlutterActivity() {
             MethodChannel(it.binaryMessenger, "com.attentive_hub.polar_ppg.main").setMethodCallHandler { call, result ->
                 when (call.method) {
                     "startScan" -> {
-                        startDeviceScan()
+                        bluetoothManager.startDeviceScan()
                         result.success(null)
                     }
                     "connectToDevice" -> {
                         val deviceId : String ? = call.argument("deviceId")
                         deviceId?.let {
-                            connectToDevice(it) // Assuming you have a connectToDevice function that takes a device ID
+                            bluetoothManager.connectToDevice(it) // Assuming you have a connectToDevice function that takes a device ID
                             result.success(null)
                         } ?: result.error("INVALID_ID", "Device ID is null or invalid.", null)
                     }
                     "disconnectFromDevice" -> {
                         val deviceId : String ? = call.argument("deviceId")
                         deviceId?.let {
-                            disconnectFromDevice(it) // Assuming you have a connectToDevice function that takes a device ID
+                            bluetoothManager.disconnectFromDevice(it) // Assuming you have a connectToDevice function that takes a device ID
                             result.success(null)
                         } ?: result.error("INVALID_ID", "Device ID is null or invalid.", null)
                     }
                     "toggleSDKMode" -> {
-                        toggleSDKMode()
+                        val toggle : Boolean = call.argument("toggle")!!
+                        streamManager.toggleSDKMode(toggle)
                         result.success(null)
                     }
                     "toggleRecord" -> {
-                        toggleRecord()
+                        val record : Boolean = call.argument("record")!!
+                        toggleRecord(record)
                         result.success(null)
                     }
                     "startListeningToChannels" -> {
                         val channels: List<String>? = call.arguments()
-                        startListeningToChannels(channels)
+                        streamManager.startListeningToChannels(channels)
                         result.success(null)
                     }
                     "stopListeningToChannels" -> {
-                        stopListeningToChannels()
+                        streamManager.stopListeningToChannels()
                         result.success(null)
                     }
                     else -> result.notImplemented()
                 }
             }
         }
-
         checkPermissions()
     }
 
@@ -147,34 +105,60 @@ class MainActivity: FlutterActivity() {
                 requestCodePermissions
             )
         } else {
-            // Initialize here if permissions are already granted at startup
-            initializePolarSDK()
+            checkDirectoryAndPermissions()
         }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == requestCodePermissions && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-            initializePolarSDK()
+            checkDirectoryAndPermissions()
         } else {
             Log.d("MyApp", "Permission not granted")
         }
     }
 
-    private fun connectToDevice(deviceId: String) {
-        try {
-            api.connectToDevice(deviceId)
-        } catch (e: PolarInvalidArgument) {
-            Log.e("MainActivity", "Error connecting to device: ${e.message}")
+    private fun checkDirectoryAndPermissions() {
+        val sharedPreferences = getSharedPreferences("MyAppPreferences", MODE_PRIVATE)
+        val directoryUriString = sharedPreferences.getString("directoryUri", null)
+        if (directoryUriString != null) {
+            initializePolarSDK()
+        } else {
+            // No directory selected, open directory picker
+            openDirectoryPicker()
         }
     }
 
-    private fun disconnectFromDevice(deviceId: String) {
-        try {
-            api.disconnectFromDevice(deviceId)
-        } catch (e: PolarInvalidArgument) {
-            Log.e("MainActivity", "Error disconnecting from device: ${e.message}")
+    private fun openDirectoryPicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        startActivityForResult(intent, requestCodeDirectory)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestCodeDirectory && resultCode == RESULT_OK) {
+            data?.data?.also { uri ->
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                val sharedPreferences = getSharedPreferences("MyAppPreferences", MODE_PRIVATE)
+                with(sharedPreferences.edit()) {
+                    putString("directoryUri", uri.toString())
+                    apply()
+                }
+                initializePolarSDK()
+            }
         }
+    }
+
+    private fun getSavedDirectoryUri(): Uri? {
+        val sharedPreferences = getSharedPreferences("MyAppPreferences", MODE_PRIVATE)
+        val directoryUriString = sharedPreferences.getString("directoryUri", null) ?: return null
+        return Uri.parse(directoryUriString)
     }
 
     private fun initializePolarSDK() {
@@ -188,6 +172,8 @@ class MainActivity: FlutterActivity() {
             PolarBleApi.PolarBleSdkFeature.FEATURE_POLAR_DEVICE_TIME_SETUP,
             PolarBleApi.PolarBleSdkFeature.FEATURE_DEVICE_INFO))
 
+        bluetoothManager = BluetoothManager(api, mainMethodChannel)
+
         api.setApiCallback(object : PolarBleApiCallback() {
             override fun blePowerStateChanged(powered: Boolean) {
                 Log.d("MyApp", "BLE power: $powered")
@@ -195,24 +181,22 @@ class MainActivity: FlutterActivity() {
 
             override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "CONNECTED: ${polarDeviceInfo.deviceId}")
-                connectedDevice = polarDeviceInfo.deviceId
+                deviceId = polarDeviceInfo.deviceId
+                streamManager = StreamManager(api, deviceId, dataMethodChannel)
 
-                connectionStatus = "Connected"
-                sendConnectionStatusToFlutter(connectionStatus, polarDeviceInfo.deviceId)
+                sendConnectionStatusToFlutter("Connected", polarDeviceInfo.deviceId)
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "CONNECTING: ${polarDeviceInfo.deviceId}")
 
-                connectionStatus = "Connecting"
-                sendConnectionStatusToFlutter(connectionStatus, polarDeviceInfo.deviceId)
+                sendConnectionStatusToFlutter("Connecting", polarDeviceInfo.deviceId)
             }
 
             override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "DISCONNECTED: ${polarDeviceInfo.deviceId}")
 
-                connectionStatus = "Disconnected"
-                sendConnectionStatusToFlutter(connectionStatus, polarDeviceInfo.deviceId)
+                sendConnectionStatusToFlutter("Disconnected", polarDeviceInfo.deviceId)
             }
 
             override fun bleSdkFeatureReady(identifier: String, feature: PolarBleApi.PolarBleSdkFeature) {
@@ -238,253 +222,16 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun toggleSDKMode() {
-        if(SDKMode) {
-            connectedDevice?.let { disableSDKMode(it) }
+    private fun toggleRecord(record: Boolean) {
+        if (record) {
 
-        } else {
-            connectedDevice?.let { enableSDKMode(it) }
         }
-    }
-
-    private fun toggleRecord() {
-//        TODO
-    }
-
-    @SuppressLint("CheckResult")
-    private fun disableSDKMode(deviceId: String) {
-        api.enableSDKMode(deviceId)
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe(
-                {
-                    Log.d(tag, "SDK mode disabled")
-                },
-                {
-                    Log.e(tag, "SDKMode err")
-                }
-            )
-    }
-
-    @SuppressLint("CheckResult")
-    private fun enableSDKMode(deviceId: String) {
-        api.enableSDKMode(deviceId)
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe(
-                {
-                    Log.d(tag, "SDK mode enabled")
-                },
-                {
-                    Log.e(tag, "SDKMode err")
-                }
-            )
-    }
-
-    private fun startListeningToChannels(channels: List<String>?) {
-        channels?.forEach { channel ->
-            when (channel) {
-                "HR " -> startHRStreaming()
-                "ECG" -> startECGStreaming()
-                "ACC" -> startACCStreaming()
-                "PPG" -> startPPGStreaming()
-                "PPI" -> startPPIStreaming()
-                "Gyro" -> startGyroStreaming()
-                "Magnetometer" -> startMagStreaming()
-            }
-        }
-    }
-
-    private fun stopListeningToChannels() {
-        streamingDisposables.clear() // Stop all streams
-        dataMethodChannel.invokeMethod("resetChannels", null)
-    }
-
-    private fun startHRStreaming() {
-        hrDisposable?.dispose() // Ensure any existing stream is disposed
-        hrDisposable = connectedDevice?.let {
-            api.startHrStreaming(it)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                    { hrData: PolarHrData ->
-                        var log : String? = null
-                        for (sample in hrData.samples) {
-                            log = "HR     bpm: ${sample.hr} rrs: ${sample.rrsMs} rrAvailable: ${sample.rrAvailable} contactStatus: ${sample.contactStatus} contactStatusSupported: ${sample.contactStatusSupported}"
-                            Log.d(tag, log)
-                        }
-                        dataMethodChannel.invokeMethod("onHRDataReceived", log)
-                    },
-                    { error ->
-                        Log.e(tag, "HR stream failed: $error")
-                    },
-                    { Log.d(tag, "HR stream complete")
-                    }
-                )
-        }
-        hrDisposable?.let { streamingDisposables.add(it) }
-    }
-
-    private fun startECGStreaming() {
-        ecgDisposable?.dispose() // Ensure any existing stream is disposed
-        ecgDisposable = connectedDevice?.let {
-            api.requestFullStreamSettings(it, PolarBleApi.PolarDeviceDataType.ECG)
-                .toFlowable()
-                .flatMap { settings: PolarSensorSetting ->
-                    api.startEcgStreaming(it, settings)
-                }
-                .subscribe(
-                    { polarEcgData: PolarEcgData ->
-                        var log : String? = null
-                        for (data in polarEcgData.samples) {
-                            log = "    yV: ${data.voltage} timeStamp: ${data.timeStamp}"
-                            Log.d(tag, log)
-                        }
-                        dataMethodChannel.invokeMethod("onECGDataReceived", log)
-                    },
-                    { error: Throwable ->
-                        Log.e(tag, "ECG stream failed. Reason $error")
-                    },
-                    { Log.d(tag, "ECG stream complete") }
-                )
-        }
-        ecgDisposable?.let { streamingDisposables.add(it) }
-    }
-
-    private fun startACCStreaming() {
-        accDisposable?.dispose() // Ensure any existing stream is disposed
-        accDisposable = connectedDevice?.let {
-            api.requestFullStreamSettings(it, PolarBleApi.PolarDeviceDataType.ACC)
-                .toFlowable()
-                .flatMap { settings: PolarSensorSetting ->
-                    api.startAccStreaming(it, settings)
-                }
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                    { polarAccelerometerData: PolarAccelerometerData ->
-                        var log : String? = null
-                        for (data in polarAccelerometerData.samples) {
-                            log = "ACC    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
-                            Log.d(tag, log)
-                        }
-                        dataMethodChannel.invokeMethod("onACCDataReceived", log)
-                    },
-                    { error: Throwable ->
-                        Log.e(tag, "ACC stream failed. Reason $error")
-                    },
-                    { Log.d(tag, "ACC stream complete") }
-                )
-        }
-        accDisposable?.let { streamingDisposables.add(it) }
-    }
-
-    private fun startGyroStreaming() {
-        gyrDisposable?.dispose() // Ensure any existing stream is disposed
-        gyrDisposable = connectedDevice?.let {
-            api.requestFullStreamSettings(it, PolarBleApi.PolarDeviceDataType.GYRO)
-                .toFlowable()
-                .flatMap { settings: PolarSensorSetting ->
-                    api.startGyroStreaming(it, settings)
-                }
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                    { polarGyroData: PolarGyroData ->
-                        var log : String? = null
-                        for (data in polarGyroData.samples) {
-                            log = "GYR    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
-                            Log.d(tag, log)
-                        }
-                        dataMethodChannel.invokeMethod("onGyrDataReceived", log)
-                    },
-                    { error: Throwable ->
-                        Log.e(tag, "Gyro stream failed. Reason $error")
-                    },
-                    { Log.d(tag, "Gyro stream complete") }
-                )
-        }
-        gyrDisposable?.let { streamingDisposables.add(it) }
-    }
-
-    private fun startMagStreaming() {
-        magDisposable?.dispose() // Ensure any existing stream is disposed
-        magDisposable = connectedDevice?.let {
-            api.requestFullStreamSettings(it, PolarBleApi.PolarDeviceDataType.GYRO)
-                .toFlowable()
-                .flatMap { settings: PolarSensorSetting ->
-                    api.startMagnetometerStreaming(it, settings)
-                }
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                    { polarMagData: PolarMagnetometerData ->
-                        var log : String? = null
-                        for (data in polarMagData.samples) {
-                            log = "MAG    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
-                            Log.d(tag, log)
-                        }
-                        dataMethodChannel.invokeMethod("onMagDataReceived", log)
-                    },
-                    { error: Throwable ->
-                        Log.e(tag, "Mag stream failed. Reason $error")
-                    },
-                    { Log.d(tag, "Mag stream complete") }
-                )
-        }
-        magDisposable?.let { streamingDisposables.add(it) }
-    }
-
-    private fun startPPGStreaming() {
-        ppgDisposable?.dispose() // Ensure any existing stream is disposed
-        ppgDisposable = connectedDevice?.let {
-            api.requestFullStreamSettings(it, PolarBleApi.PolarDeviceDataType.PPG)
-                .toFlowable()
-                .flatMap { settings: PolarSensorSetting ->
-                    api.startPpgStreaming(it, settings)
-                }
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                    { polarPpgData: PolarPpgData ->
-                        var log : String? = null
-                        if (polarPpgData.type == PolarPpgData.PpgDataType.PPG3_AMBIENT1) {
-                            for (data in polarPpgData.samples) {
-                                log = "PPG    ppg0: ${data.channelSamples[0]} ppg1: ${data.channelSamples[1]} ppg2: ${data.channelSamples[2]} ambient: ${data.channelSamples[3]} timeStamp: ${data.timeStamp}"
-                                Log.d(tag, log)
-                            }
-                        }
-                        dataMethodChannel.invokeMethod("onPPGDataReceived", log)
-                    },
-                    { error: Throwable ->
-                        Log.e(tag, "Ppg stream failed. Reason $error")
-                    },
-                    { Log.d(tag, "Ppg stream complete") }
-                )
-        }
-        ppgDisposable?.let { streamingDisposables.add(it) }
-    }
-
-    private fun startPPIStreaming() {
-        ppiDisposable?.dispose() // Ensure any existing stream is disposed
-        ppiDisposable = connectedDevice?.let {
-            api.startPpiStreaming(it)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                    { ppiData: PolarPpiData ->
-                        var log : String? = null
-                        for (sample in ppiData.samples) {
-                            log = "PPI    ppi: ${sample.ppi} blocker: ${sample.blockerBit} errorEstimate: ${sample.errorEstimate}"
-                            Log.d(tag, log)
-                        }
-                        dataMethodChannel.invokeMethod("onPPIDataReceived", log)
-                    },
-                    { error: Throwable ->
-                        Log.e(tag, "Ppi stream failed. Reason $error")
-                    },
-                    { Log.d(tag, "Ppi stream complete") }
-                )
-        }
-        ppiDisposable?.let { streamingDisposables.add(it) }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        scanDisposable?.dispose()
-        streamingDisposables.dispose()
+        bluetoothManager.scanDisposable?.dispose()
+        streamManager.streamingDisposables.dispose()
         // Disconnect from the Polar device and perform cleanup
         api.shutDown()
     }

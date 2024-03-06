@@ -16,8 +16,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Polar Logger2 App',
       theme: ThemeData(
+        scaffoldBackgroundColor: Colors.grey.shade300,
         primarySwatch: Colors.blue,
-        primaryColor: Colors.green,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: const MainPage(),
     );
@@ -36,7 +37,7 @@ class _MainPageState extends State<MainPage> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    const MyHomePage(title: 'Home'), // Assuming MyHomePage is your home page
+    const MyHomePage(title: 'Configuration Page'), // Assuming MyHomePage is your home page
     const DataPage(), // Create this widget for displaying data
     const GraphPage(), // Placeholder widget for future graph functionalities
   ];
@@ -61,9 +62,10 @@ class _MainPageState extends State<MainPage> {
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Graphs'),
         ],
         currentIndex: _selectedIndex,
+        backgroundColor: Colors.grey.shade600,
         onTap: _onItemTapped,
         selectedItemColor: Colors.greenAccent,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
       ),
     );
   }

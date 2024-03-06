@@ -51,7 +51,7 @@ class _MyHomePageState extends State<MyHomePage> {
               toastLength: Toast.LENGTH_SHORT,
               gravity: ToastGravity.CENTER,
               timeInSecForIosWeb: 1,
-              textColor: status == "Connected" ? Colors.greenAccent : Colors.red,
+              textColor: status == "Connected" ? Colors.greenAccent : Colors.redAccent,
               fontSize: 16.0,
             );
           }
@@ -211,7 +211,7 @@ class _MyHomePageState extends State<MyHomePage> {
         children: <Widget>[
           Icon(
             isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-            color: isSelected ? Colors.greenAccent : Colors.grey,
+            color: isSelected ? Colors.redAccent : Colors.white,
           ),
           Padding(
             padding: const EdgeInsets.only(left: 8.0),
@@ -226,27 +226,51 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildChannelSelectionGrid() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, // Align content to the start
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.only(top: 20.0, bottom: 12.0), // Add some space below the heading
-          child: Text(
-            'Channel Selection',
-            style: Theme.of(context).textTheme.titleLarge, // Styling for the heading
-          ),
+    return Container(
+      margin: const EdgeInsets.all(12), // Adjust the margin as needed
+      padding: const EdgeInsets.all(12), // Adjust padding as needed for the content inside the container
+      decoration: BoxDecoration(
+        color: Colors.greenAccent, // Background color of the container
+        borderRadius: BorderRadius.circular(15), // Adjust for rounded corners
+        border: Border.all(
+          color: Colors.grey.shade300, // Color of the border
+          width: 1, // Width of the border
         ),
-        Padding( // Apply padding to the Wrap widget to align it with the title
-          padding: const EdgeInsets.only(right: 25.0),
-          child: Wrap(
-            spacing: 50.0, // Horizontal space between buttons
-            runSpacing: 5.0, // Vertical space between lines
-            children: List<Widget>.generate(_channels.length, (index) {
-              return _buildSelectableChannel(index);
-            }),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200, // Shadow color
+            blurRadius: 5, // Shadow blur radius
+            offset: const Offset(0, 3), // Shadow position
           ),
-        ),
-      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 0.0, bottom: 12.0),
+              child: Text(
+                'Channel Selection',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold, // Make text bold
+                  fontSize: Theme.of(context).textTheme.titleLarge?.fontSize, // Use the large title font size
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 0.0, left: 40.0, bottom: 7.0),
+            child: Wrap(
+              spacing: 40.0, // Horizontal space between buttons
+              runSpacing: 10.0, // Vertical space between lines
+              children: List<Widget>.generate(_channels.length, (index) {
+                return _buildSelectableChannel(index);
+              }),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -293,16 +317,14 @@ class _MyHomePageState extends State<MyHomePage> {
         ElevatedButton(
           onPressed: !_channelsConfirmed && _selectedChannelIndices.isNotEmpty ? () {
             final selectedChannels = _selectedChannelIndices.map((index) => _channels[index]).toList();
-            if (_isSdkEnabled) {
-              platform.invokeMethod("toggleSDKMode");
-            }
-            if (_isRecordingEnabled) {
-              platform.invokeMethod("toggleRecord");
-            }
-            platform.invokeMethod('startListeningToChannels', selectedChannels).then((_) {
-              setState(() {
-                _channelsConfirmed = true; // Confirm selection
-              });
+            platform.invokeMethod("toggleSDKMode", {'toggle': _isSdkEnabled}).then((_) {
+                platform.invokeMethod("toggleRecord", {'record': _isRecordingEnabled}).then((_) {
+                  platform.invokeMethod('startListeningToChannels', selectedChannels).then((_) {
+                    setState(() {
+                      _channelsConfirmed = true; // Confirm selection
+                    });
+                  });
+                });
             });
           } : null, // Disable button if conditions are not met
           style: ElevatedButton.styleFrom(
@@ -320,19 +342,11 @@ class _MyHomePageState extends State<MyHomePage> {
               setState(() {
                 _channelsConfirmed = false; // Reset confirmation
                 _selectedChannelIndices.clear(); // Clear selections
-                // hrData = "";
-                // ecgData = "";
-                // accData = "";
-                // ppgData = "";
-                // ppiData = "";
-                // gyroData = "";
-                // hrData = "";
-                // magData = "";
               });
             });
           } : null, // Disable button if conditions are not met
           style: ElevatedButton.styleFrom(
-            backgroundColor: _channelsConfirmed ? Colors.red : Colors.grey, // Color when disabled
+            backgroundColor: _channelsConfirmed ? Colors.redAccent : Colors.grey, // Color when disabled
           ),
           child: const Text(
             'Reset',
@@ -350,13 +364,14 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        backgroundColor: Colors.grey.shade600,
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: <Widget>[
             // Use a Row widget to place buttons next to each other
-            const Padding(padding: EdgeInsets.only(top: 15.0, bottom: 0.0)),
+            const Padding(padding: EdgeInsets.only(top: 30.0, bottom: 0.0)),
             Row(
               mainAxisAlignment: MainAxisAlignment.center, // Center the row content
               children: <Widget>[
@@ -373,7 +388,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ElevatedButton(
                   onPressed: isConnected ? _removeDevice : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isConnected ? Colors.red : Colors.grey, // Grey out if not connected
+                    backgroundColor: isConnected ? Colors.redAccent : Colors.grey, // Grey out if not connected
                   ),
                   child: const Text('Unpair Sensor',
                     style: TextStyle(color: Colors.black),
@@ -398,9 +413,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
             ),
-            const Padding(padding: EdgeInsets.only(top: 60.0, bottom: 0.0)),
+            const Padding(padding: EdgeInsets.only(top: 50.0, bottom: 0.0)),
             _buildChannelSelectionGrid(),
-            const Padding(padding: EdgeInsets.only(top: 60.0, bottom: 0.0)),
+            const Padding(padding: EdgeInsets.only(top: 45.0, bottom: 0.0)),
             _buildSDKToggle(),
             // const Padding(padding: EdgeInsets.only(top: 20.0, bottom: 0.0)),
             _buildRecordToggle(),
