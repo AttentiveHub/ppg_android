@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.util.Log
 import com.polar.sdk.api.PolarBleApi
 import com.polar.sdk.api.model.PolarAccelerometerData
-import com.polar.sdk.api.model.PolarEcgData
 import com.polar.sdk.api.model.PolarGyroData
 import com.polar.sdk.api.model.PolarHrData
 import com.polar.sdk.api.model.PolarMagnetometerData
@@ -22,7 +21,6 @@ import kotlinx.coroutines.launch
 
 class StreamManager(private val api: PolarBleApi, private val connectedDevice: String, private val recordManager: RecordManager, private val dataMethodChannel: MethodChannel) {
     private var hrDisposable: Disposable? = null
-    private var ecgDisposable: Disposable? = null
     private var accDisposable: Disposable? = null
     private var ppgDisposable: Disposable? = null
     private var ppiDisposable: Disposable? = null
@@ -105,10 +103,10 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { hrData: PolarHrData ->
                         var log : String?
                         for (sample in hrData.samples) {
-                            log = "${sample.hr};"
                             scope.launch {
-                                recordManager.writeData("HR", log)
+                                recordManager.writeData("HR", "${sample.hr};")
                             }
+                            log = "HR     bpm: ${sample.hr} rrs: ${sample.rrsMs} rrAvailable: ${sample.rrAvailable} contactStatus: ${sample.contactStatus} contactStatusSupported: ${sample.contactStatusSupported}"
                             dataMethodChannel.invokeMethod("onHRDataReceived", log)
                         }
                     },
@@ -123,31 +121,31 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
     }
 
     private fun startECGStreaming() {
-        ecgDisposable?.dispose() // Ensure any existing stream is disposed
-        ecgDisposable = connectedDevice.let {
-            api.requestFullStreamSettings(it, PolarBleApi.PolarDeviceDataType.ECG)
-                .toFlowable()
-                .flatMap { settings: PolarSensorSetting ->
-                    api.startEcgStreaming(it, settings)
-                }
-                .subscribe(
-                    { polarEcgData: PolarEcgData ->
-                        var log : String?
-                        for (data in polarEcgData.samples) {
-                            log = "    yV: ${data.voltage} timeStamp: ${data.timeStamp};"
-                            scope.launch {
-                                recordManager.writeData("ECG", log)
-                            }
-                            dataMethodChannel.invokeMethod("onECGDataReceived", log)
-                        }
-                    },
-                    { error: Throwable ->
-                        Log.e(tag, "ECG stream failed. Reason $error")
-                    },
-                    { Log.d(tag, "ECG stream complete") }
-                )
-        }
-        ecgDisposable?.let { streamingDisposables.add(it) }
+//        ecgDisposable?.dispose() // Ensure any existing stream is disposed
+//        ecgDisposable = connectedDevice.let {
+//            api.requestFullStreamSettings(it, PolarBleApi.PolarDeviceDataType.ECG)
+//                .toFlowable()
+//                .flatMap { settings: PolarSensorSetting ->
+//                    api.startEcgStreaming(it, settings)
+//                }
+//                .subscribe(
+//                    { polarEcgData: PolarEcgData ->
+//                        var log : String?
+//                        for (data in polarEcgData.samples) {
+//                            log = "    yV: ${data.voltage} timeStamp: ${data.timeStamp};"
+//                            scope.launch {
+//                                recordManager.writeData("ECG", log)
+//                            }
+//                            dataMethodChannel.invokeMethod("onECGDataReceived", log)
+//                        }
+//                    },
+//                    { error: Throwable ->
+//                        Log.e(tag, "ECG stream failed. Reason $error")
+//                    },
+//                    { Log.d(tag, "ECG stream complete") }
+//                )
+//        }
+//        ecgDisposable?.let { streamingDisposables.add(it) }
     }
 
     private fun startACCStreaming() {
@@ -163,10 +161,10 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { polarAccelerometerData: PolarAccelerometerData ->
                         var log : String?
                         for (data in polarAccelerometerData.samples) {
-                            log = "${data.timeStamp};${data.x};${data.y};${data.z};"
                             scope.launch {
-                                recordManager.writeData("ACC", log)
+                                recordManager.writeData("ACC", "${data.timeStamp};${data.x};${data.y};${data.z};")
                             }
+                            log = "ACC    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
                             dataMethodChannel.invokeMethod("onACCDataReceived", log)
                         }
                     },
@@ -192,10 +190,10 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { polarGyroData: PolarGyroData ->
                         var log : String?
                         for (data in polarGyroData.samples) {
-                            log = "${data.timeStamp};${data.x};${data.y};${data.z};"
                             scope.launch {
-                                recordManager.writeData("Gyro", log)
+                                recordManager.writeData("Gyro", "${data.timeStamp};${data.x};${data.y};${data.z};")
                             }
+                            log = "GYR    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
                             dataMethodChannel.invokeMethod("onGyrDataReceived", log)
                         }
                     },
@@ -221,10 +219,10 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { polarMagData: PolarMagnetometerData ->
                         var log : String?
                         for (data in polarMagData.samples) {
-                            log = "${data.timeStamp};${data.x};${data.y};${data.z};"
                             scope.launch {
-                                recordManager.writeData("Magnetometer", log)
+                                recordManager.writeData("Magnetometer", "${data.timeStamp};${data.x};${data.y};${data.z};")
                             }
+                            log = "MAG    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
                             dataMethodChannel.invokeMethod("onMagDataReceived", log)
                         }
                     },
@@ -251,10 +249,10 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                         var log : String?
                         if (polarPpgData.type == PolarPpgData.PpgDataType.PPG3_AMBIENT1) {
                             for (data in polarPpgData.samples) {
-                                log = "${data.timeStamp};${data.channelSamples[0]};${data.channelSamples[1]};${data.channelSamples[2]};${data.channelSamples[3]};"
                                 scope.launch {
-                                    recordManager.writeData("PPG", log)
+                                    recordManager.writeData("PPG", "${data.timeStamp};${data.channelSamples[0]};${data.channelSamples[1]};${data.channelSamples[2]};${data.channelSamples[3]};")
                                 }
+                                log = "PPG    ppg0: ${data.channelSamples[0]} ppg1: ${data.channelSamples[1]} ppg2: ${data.channelSamples[2]} ambient: ${data.channelSamples[3]} timeStamp: ${data.timeStamp}"
                                 dataMethodChannel.invokeMethod("onPPGDataReceived", log)
                             }
                         }
@@ -277,10 +275,10 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { ppiData: PolarPpiData ->
                         var log : String?
                         for (sample in ppiData.samples) {
-                            log = "${sample.ppi};${sample.errorEstimate};${sample.blockerBit};${sample.skinContactStatus};${sample.skinContactSupported};${sample.hr};"
                             scope.launch {
-                                recordManager.writeData("PPI", log)
+                                recordManager.writeData("PPI", "${sample.ppi};${sample.errorEstimate};${sample.blockerBit};${sample.skinContactStatus};${sample.skinContactSupported};${sample.hr};")
                             }
+                            log = "PPI    ppi: ${sample.ppi} blocker: ${sample.blockerBit} errorEstimate: ${sample.errorEstimate}"
                             dataMethodChannel.invokeMethod("onPPIDataReceived", log)
                         }
                     },

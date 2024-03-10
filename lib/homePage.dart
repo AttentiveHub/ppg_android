@@ -338,12 +338,35 @@ class _MyHomePageState extends State<MyHomePage> {
         const SizedBox(width: 20), // Space between buttons
         ElevatedButton(
           onPressed: _channelsConfirmed ? () {
-            platform.invokeMethod('stopListeningToChannels').then((_) {
-              setState(() {
-                _channelsConfirmed = false; // Reset confirmation
-                _selectedChannelIndices.clear(); // Clear selections
-              });
-            });
+            // Show confirmation dialog before resetting
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('Reset Confirmation'),
+                  content: const Text('Are you sure you want to reset?\nYour recording session will end'),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(), // Close the dialog
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        // Reset logic here
+                        platform.invokeMethod('stopListeningToChannels').then((_) {
+                          setState(() {
+                            _channelsConfirmed = false; // Reset confirmation
+                            _selectedChannelIndices.clear(); // Clear selections
+                          });
+                          Navigator.of(context).pop(); // Close the dialog after resetting
+                        });
+                      },
+                      child: const Text('Yes'),
+                    ),
+                  ],
+                );
+              },
+            );
           } : null, // Disable button if conditions are not met
           style: ElevatedButton.styleFrom(
             backgroundColor: _channelsConfirmed ? Colors.redAccent : Colors.grey, // Color when disabled
@@ -353,6 +376,7 @@ class _MyHomePageState extends State<MyHomePage> {
             style: TextStyle(color: Colors.black),
           ),
         ),
+
       ],
     );
   }

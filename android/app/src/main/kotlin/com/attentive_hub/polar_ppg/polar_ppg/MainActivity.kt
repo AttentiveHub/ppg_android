@@ -74,11 +74,13 @@ class MainActivity: FlutterActivity() {
                         result.success(null)
                     }
                     "startListeningToChannels" -> {
+                        startStreamingService()
                         val channels: List<String>? = call.arguments()
                         streamManager.startListeningToChannels(channels)
                         result.success(null)
                     }
                     "stopListeningToChannels" -> {
+                        stopStreamingService()
                         streamManager.stopListeningToChannels()
                         result.success(null)
                     }
@@ -93,7 +95,10 @@ class MainActivity: FlutterActivity() {
         val requiredPermissions = mutableListOf(
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.ACCESS_FINE_LOCATION
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Manifest.permission.POST_NOTIFICATIONS
+            } else {""}
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -231,6 +236,16 @@ class MainActivity: FlutterActivity() {
                 "deviceId" to deviceId
             ))
         }
+    }
+
+    private fun startStreamingService() {
+        val serviceIntent = Intent(this, StreamingService::class.java)
+        ContextCompat.startForegroundService(this, serviceIntent)
+    }
+
+    private fun stopStreamingService() {
+        val serviceIntent = Intent(this, StreamingService::class.java)
+        stopService(serviceIntent)
     }
 
     override fun onDestroy() {

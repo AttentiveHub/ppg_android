@@ -1,4 +1,4 @@
-package com.attentive_hub.polar_ppg.polar_ppg;
+package com.attentive_hub.polar_ppg.polar_ppg
 
 import android.util.Log
 import com.polar.sdk.api.PolarBleApi

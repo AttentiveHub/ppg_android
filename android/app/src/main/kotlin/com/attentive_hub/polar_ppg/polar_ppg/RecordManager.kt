@@ -37,20 +37,24 @@ class RecordManager(private val context: Context, private val baseUri: Uri) {
     private fun createFileForChannel(directory: DocumentFile, channel: String) {
         val file = directory.createFile("text/plain", "$channel.txt") ?: return
         val header = getHeaderForRow(channel)
-        appendToFile(file.uri, header)
+        appendToFile(file.uri, header, true)
         channelFileUris[channel] = file.uri
     }
 
-    fun writeData(channel: String, data: String) {
+    fun writeData(channel: String, data: String, isHeader: Boolean = false) {
         if (!recordingEnabled) return // No session to write to
 
         val fileUri = channelFileUris[channel] ?: return
-        appendToFile(fileUri, data)
+        appendToFile(fileUri, data, isHeader)
     }
 
-    private fun appendToFile(fileUri: Uri, data: String) {
-        val currentTimeStamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
-        val formattedData = "$currentTimeStamp;$data"
+    private fun appendToFile(fileUri: Uri, data: String, isHeader: Boolean) {
+        val formattedData = if (isHeader) {
+            data
+        } else {
+            val currentTimeStamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+            "$currentTimeStamp;$data"
+        }
 
         synchronized(writeLock) {
             context.contentResolver.openOutputStream(fileUri, "wa")?.use { outputStream ->

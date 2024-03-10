@@ -9,12 +9,18 @@
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
-        android:label="polar_ppg"
+        android:label="Polar URA"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ura"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="tiramisu">
+
+        <service android:name=".StreamingService"
+            android:foregroundServiceType="dataSync" />
 
         <activity
             android:name=".MainActivity"
