@@ -49,10 +49,13 @@ class RecordManager(private val context: Context, private val baseUri: Uri) {
     }
 
     private fun appendToFile(fileUri: Uri, data: String) {
+        val currentTimeStamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+        val formattedData = "$currentTimeStamp;$data"
+
         synchronized(writeLock) {
             context.contentResolver.openOutputStream(fileUri, "wa")?.use { outputStream ->
                 OutputStreamWriter(outputStream).apply {
-                    append(data)
+                    append(formattedData)
                     append("\n")
                     flush()
                     close()

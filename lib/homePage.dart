@@ -24,7 +24,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<String> _channels = ['HR  ', 'ECG', 'ACC', 'PPG', 'PPI ', 'Gyro',];// 'Magnetometer'];
   final List<int> _selectedChannelIndices = [];
   bool _channelsConfirmed = false; // Tracks whether the selection has been confirmed
-  final int _maxChannels = 3;
+  final int _maxChannels = 4;
 
   bool _isSdkEnabled = false;
   bool _isRecordingEnabled = false;

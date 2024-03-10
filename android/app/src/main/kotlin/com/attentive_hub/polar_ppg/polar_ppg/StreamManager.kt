@@ -19,9 +19,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class StreamManager(private val api: PolarBleApi, private val connectedDevice: String, private val recordManager: RecordManager, private val dataMethodChannel: MethodChannel) {
     private var hrDisposable: Disposable? = null
@@ -67,7 +64,7 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
         if(toggle) {
             enableSDKMode(connectedDevice)
         } else {
-//            disableSDKMode(connectedDevice)
+            disableSDKMode(connectedDevice)
         }
     }
 
@@ -108,9 +105,7 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { hrData: PolarHrData ->
                         var log : String?
                         for (sample in hrData.samples) {
-                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
-                            log = "${phoneTimestamp};${sample.hr};"
-                            Log.d(tag, log)
+                            log = "${sample.hr};"
                             scope.launch {
                                 recordManager.writeData("HR", log)
                             }
@@ -140,7 +135,6 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                         var log : String?
                         for (data in polarEcgData.samples) {
                             log = "    yV: ${data.voltage} timeStamp: ${data.timeStamp};"
-                            Log.d(tag, log)
                             scope.launch {
                                 recordManager.writeData("ECG", log)
                             }
@@ -169,9 +163,7 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { polarAccelerometerData: PolarAccelerometerData ->
                         var log : String?
                         for (data in polarAccelerometerData.samples) {
-//                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
-                            log = ";${data.timeStamp};${data.x};${data.y};${data.z};"
-                            Log.d(tag, log)
+                            log = "${data.timeStamp};${data.x};${data.y};${data.z};"
                             scope.launch {
                                 recordManager.writeData("ACC", log)
                             }
@@ -200,9 +192,7 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { polarGyroData: PolarGyroData ->
                         var log : String?
                         for (data in polarGyroData.samples) {
-//                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
-                            log = ";${data.timeStamp};${data.x};${data.y};${data.z};"
-                            Log.d(tag, log)
+                            log = "${data.timeStamp};${data.x};${data.y};${data.z};"
                             scope.launch {
                                 recordManager.writeData("Gyro", log)
                             }
@@ -231,11 +221,9 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { polarMagData: PolarMagnetometerData ->
                         var log : String?
                         for (data in polarMagData.samples) {
-                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
-                            log = "${phoneTimestamp};${data.timeStamp};${data.x};${data.y};${data.z};"
-                            Log.d(tag, log)
+                            log = "${data.timeStamp};${data.x};${data.y};${data.z};"
                             scope.launch {
-                                recordManager.writeData("Magno", log)
+                                recordManager.writeData("Magnetometer", log)
                             }
                             dataMethodChannel.invokeMethod("onMagDataReceived", log)
                         }
@@ -263,9 +251,7 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                         var log : String?
                         if (polarPpgData.type == PolarPpgData.PpgDataType.PPG3_AMBIENT1) {
                             for (data in polarPpgData.samples) {
-//                                val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
-                                log = ";${data.timeStamp};${data.channelSamples[0]};${data.channelSamples[1]};${data.channelSamples[2]};${data.channelSamples[3]};"
-                                Log.d(tag, log)
+                                log = "${data.timeStamp};${data.channelSamples[0]};${data.channelSamples[1]};${data.channelSamples[2]};${data.channelSamples[3]};"
                                 scope.launch {
                                     recordManager.writeData("PPG", log)
                                 }
@@ -291,9 +277,7 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                     { ppiData: PolarPpiData ->
                         var log : String?
                         for (sample in ppiData.samples) {
-                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
-                            log = "${phoneTimestamp};${sample.ppi};${sample.errorEstimate};${sample.blockerBit};${sample.skinContactStatus};${sample.skinContactSupported};${sample.hr};"
-                            Log.d(tag, log)
+                            log = "${sample.ppi};${sample.errorEstimate};${sample.blockerBit};${sample.skinContactStatus};${sample.skinContactSupported};${sample.hr};"
                             scope.launch {
                                 recordManager.writeData("PPI", log)
                             }
