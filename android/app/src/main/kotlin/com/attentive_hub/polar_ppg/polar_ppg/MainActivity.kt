@@ -20,14 +20,16 @@ import java.util.*
 class MainActivity: FlutterActivity() {
     private lateinit var api: PolarBleApi
     private lateinit var deviceId: String
-    private lateinit var streamManager: StreamManager
-    private lateinit var bluetoothManager: BluetoothManager
 
-    private val requestCodePermissions = 101
-    private val requestCodeDirectory = 102
+    private lateinit var bluetoothManager: BluetoothManager
+    private lateinit var recordManager: RecordManager
+    private lateinit var streamManager: StreamManager
 
     private lateinit var mainMethodChannel: MethodChannel
     private lateinit var dataMethodChannel: MethodChannel
+
+    private val requestCodePermissions = 101
+    private val requestCodeDirectory = 102
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,14 +58,19 @@ class MainActivity: FlutterActivity() {
                             result.success(null)
                         } ?: result.error("INVALID_ID", "Device ID is null or invalid.", null)
                     }
+
+                    "toggleRecord" -> {
+                        val record : Boolean = call.argument("record")!!
+                        val channels: List<String>? = call.argument("selectedChannels")
+                        if (channels != null) {
+                            recordManager.toggleRecord(record, channels)
+                        }
+                        result.success(null)
+                    }
+
                     "toggleSDKMode" -> {
                         val toggle : Boolean = call.argument("toggle")!!
                         streamManager.toggleSDKMode(toggle)
-                        result.success(null)
-                    }
-                    "toggleRecord" -> {
-                        val record : Boolean = call.argument("record")!!
-                        toggleRecord(record)
                         result.success(null)
                     }
                     "startListeningToChannels" -> {
@@ -173,6 +180,10 @@ class MainActivity: FlutterActivity() {
             PolarBleApi.PolarBleSdkFeature.FEATURE_DEVICE_INFO))
 
         bluetoothManager = BluetoothManager(api, mainMethodChannel)
+        val savedUri = getSavedDirectoryUri()
+        savedUri?.let {
+            recordManager = RecordManager(this, it)
+        }
 
         api.setApiCallback(object : PolarBleApiCallback() {
             override fun blePowerStateChanged(powered: Boolean) {
@@ -182,7 +193,7 @@ class MainActivity: FlutterActivity() {
             override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d("MyApp", "CONNECTED: ${polarDeviceInfo.deviceId}")
                 deviceId = polarDeviceInfo.deviceId
-                streamManager = StreamManager(api, deviceId, dataMethodChannel)
+                streamManager = StreamManager(api, deviceId, recordManager, dataMethodChannel)
 
                 sendConnectionStatusToFlutter("Connected", polarDeviceInfo.deviceId)
             }
@@ -216,23 +227,19 @@ class MainActivity: FlutterActivity() {
     private fun sendConnectionStatusToFlutter(status: String, deviceId: String) {
         runOnUiThread {
             mainMethodChannel.invokeMethod("updateConnectionStatus", mapOf(
-                    "status" to status,
-                    "deviceId" to deviceId
+                "status" to status,
+                "deviceId" to deviceId
             ))
-        }
-    }
-
-    private fun toggleRecord(record: Boolean) {
-        if (record) {
-
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+
         bluetoothManager.scanDisposable?.dispose()
         streamManager.streamingDisposables.dispose()
-        // Disconnect from the Polar device and perform cleanup
+        streamManager.job.cancel()
+
         api.shutDown()
     }
 }

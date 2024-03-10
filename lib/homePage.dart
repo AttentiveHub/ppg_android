@@ -318,7 +318,7 @@ class _MyHomePageState extends State<MyHomePage> {
           onPressed: !_channelsConfirmed && _selectedChannelIndices.isNotEmpty ? () {
             final selectedChannels = _selectedChannelIndices.map((index) => _channels[index]).toList();
             platform.invokeMethod("toggleSDKMode", {'toggle': _isSdkEnabled}).then((_) {
-                platform.invokeMethod("toggleRecord", {'record': _isRecordingEnabled}).then((_) {
+                platform.invokeMethod("toggleRecord", {'record': _isRecordingEnabled, 'selectedChannels': selectedChannels}).then((_) {
                   platform.invokeMethod('startListeningToChannels', selectedChannels).then((_) {
                     setState(() {
                       _channelsConfirmed = true; // Confirm selection
@@ -363,8 +363,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.grey.shade600,
+        title: Text(
+          widget.title,
+          style: const TextStyle(fontWeight: FontWeight.bold), // Make text bold
+        ),
+        centerTitle: true, // Center the title
+        backgroundColor: Colors.greenAccent,
       ),
       body: Center(
         child: Column(
@@ -417,7 +421,6 @@ class _MyHomePageState extends State<MyHomePage> {
             _buildChannelSelectionGrid(),
             const Padding(padding: EdgeInsets.only(top: 45.0, bottom: 0.0)),
             _buildSDKToggle(),
-            // const Padding(padding: EdgeInsets.only(top: 20.0, bottom: 0.0)),
             _buildRecordToggle(),
             const Padding(padding: EdgeInsets.only(top: 60.0, bottom: 0.0)),
             _buildConfirmResetButtons(),

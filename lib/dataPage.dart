@@ -113,8 +113,12 @@ class _DataPageState extends State<DataPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Data Page"),
-        backgroundColor: Colors.grey.shade600, // Adjusted to your preference
+        title: const Text(
+          "Data Page",
+          style: TextStyle(fontWeight: FontWeight.bold), // Make text bold
+        ),
+        centerTitle: true, // Center the title
+        backgroundColor: Colors.grey.shade400,
       ),
       body: SingleChildScrollView( // Allows scrolling when content overflows
         child: Column(

@@ -15,8 +15,15 @@ import io.flutter.plugin.common.MethodChannel
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.disposables.Disposable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-class StreamManager(private val api: PolarBleApi, private val connectedDevice: String, private val dataMethodChannel: MethodChannel) {
+class StreamManager(private val api: PolarBleApi, private val connectedDevice: String, private val recordManager: RecordManager, private val dataMethodChannel: MethodChannel) {
     private var hrDisposable: Disposable? = null
     private var ecgDisposable: Disposable? = null
     private var accDisposable: Disposable? = null
@@ -27,12 +34,19 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
 
     var streamingDisposables = CompositeDisposable()
 
+    val job = Job()
+    private val scope = CoroutineScope(Dispatchers.IO + job)
+    private lateinit var channels: List<String>
+
     private val tag = "PPG LEGO"
 
     fun startListeningToChannels(channels: List<String>?) {
+        if (channels != null) {
+            this.channels = channels
+        }
         channels?.forEach { channel ->
-            when (channel) {
-                "HR " -> startHRStreaming()
+            when (channel.trim()) {
+                "HR" -> startHRStreaming()
                 "ECG" -> startECGStreaming()
                 "ACC" -> startACCStreaming()
                 "PPG" -> startPPGStreaming()
@@ -46,13 +60,14 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
     fun stopListeningToChannels() {
         streamingDisposables.clear() // Stop all streams
         dataMethodChannel.invokeMethod("resetChannels", null)
+        recordManager.shareData()
     }
 
     fun toggleSDKMode(toggle: Boolean) {
         if(toggle) {
             enableSDKMode(connectedDevice)
         } else {
-            disableSDKMode(connectedDevice)
+//            disableSDKMode(connectedDevice)
         }
     }
 
@@ -91,12 +106,16 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     { hrData: PolarHrData ->
-                        var log : String? = null
+                        var log : String?
                         for (sample in hrData.samples) {
-                            log = "HR     bpm: ${sample.hr} rrs: ${sample.rrsMs} rrAvailable: ${sample.rrAvailable} contactStatus: ${sample.contactStatus} contactStatusSupported: ${sample.contactStatusSupported}"
+                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+                            log = "${phoneTimestamp};${sample.hr};"
                             Log.d(tag, log)
+                            scope.launch {
+                                recordManager.writeData("HR", log)
+                            }
+                            dataMethodChannel.invokeMethod("onHRDataReceived", log)
                         }
-                        dataMethodChannel.invokeMethod("onHRDataReceived", log)
                     },
                     { error ->
                         Log.e(tag, "HR stream failed: $error")
@@ -118,12 +137,15 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                 }
                 .subscribe(
                     { polarEcgData: PolarEcgData ->
-                        var log : String? = null
+                        var log : String?
                         for (data in polarEcgData.samples) {
-                            log = "    yV: ${data.voltage} timeStamp: ${data.timeStamp}"
+                            log = "    yV: ${data.voltage} timeStamp: ${data.timeStamp};"
                             Log.d(tag, log)
+                            scope.launch {
+                                recordManager.writeData("ECG", log)
+                            }
+                            dataMethodChannel.invokeMethod("onECGDataReceived", log)
                         }
-                        dataMethodChannel.invokeMethod("onECGDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "ECG stream failed. Reason $error")
@@ -145,12 +167,16 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     { polarAccelerometerData: PolarAccelerometerData ->
-                        var log : String? = null
+                        var log : String?
                         for (data in polarAccelerometerData.samples) {
-                            log = "ACC    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
+//                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+                            log = ";${data.timeStamp};${data.x};${data.y};${data.z};"
                             Log.d(tag, log)
+                            scope.launch {
+                                recordManager.writeData("ACC", log)
+                            }
+                            dataMethodChannel.invokeMethod("onACCDataReceived", log)
                         }
-                        dataMethodChannel.invokeMethod("onACCDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "ACC stream failed. Reason $error")
@@ -172,12 +198,16 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     { polarGyroData: PolarGyroData ->
-                        var log : String? = null
+                        var log : String?
                         for (data in polarGyroData.samples) {
-                            log = "GYR    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
+//                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+                            log = ";${data.timeStamp};${data.x};${data.y};${data.z};"
                             Log.d(tag, log)
+                            scope.launch {
+                                recordManager.writeData("Gyro", log)
+                            }
+                            dataMethodChannel.invokeMethod("onGyrDataReceived", log)
                         }
-                        dataMethodChannel.invokeMethod("onGyrDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Gyro stream failed. Reason $error")
@@ -199,12 +229,16 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     { polarMagData: PolarMagnetometerData ->
-                        var log : String? = null
+                        var log : String?
                         for (data in polarMagData.samples) {
-                            log = "MAG    x: ${data.x} y: ${data.y} z: ${data.z} timeStamp: ${data.timeStamp}"
+                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+                            log = "${phoneTimestamp};${data.timeStamp};${data.x};${data.y};${data.z};"
                             Log.d(tag, log)
+                            scope.launch {
+                                recordManager.writeData("Magno", log)
+                            }
+                            dataMethodChannel.invokeMethod("onMagDataReceived", log)
                         }
-                        dataMethodChannel.invokeMethod("onMagDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Mag stream failed. Reason $error")
@@ -226,14 +260,18 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     { polarPpgData: PolarPpgData ->
-                        var log : String? = null
+                        var log : String?
                         if (polarPpgData.type == PolarPpgData.PpgDataType.PPG3_AMBIENT1) {
                             for (data in polarPpgData.samples) {
-                                log = "PPG    ppg0: ${data.channelSamples[0]} ppg1: ${data.channelSamples[1]} ppg2: ${data.channelSamples[2]} ambient: ${data.channelSamples[3]} timeStamp: ${data.timeStamp}"
+//                                val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+                                log = ";${data.timeStamp};${data.channelSamples[0]};${data.channelSamples[1]};${data.channelSamples[2]};${data.channelSamples[3]};"
                                 Log.d(tag, log)
+                                scope.launch {
+                                    recordManager.writeData("PPG", log)
+                                }
+                                dataMethodChannel.invokeMethod("onPPGDataReceived", log)
                             }
                         }
-                        dataMethodChannel.invokeMethod("onPPGDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Ppg stream failed. Reason $error")
@@ -251,12 +289,16 @@ class StreamManager(private val api: PolarBleApi, private val connectedDevice: S
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     { ppiData: PolarPpiData ->
-                        var log : String? = null
+                        var log : String?
                         for (sample in ppiData.samples) {
-                            log = "PPI    ppi: ${sample.ppi} blocker: ${sample.blockerBit} errorEstimate: ${sample.errorEstimate}"
+                            val phoneTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+                            log = "${phoneTimestamp};${sample.ppi};${sample.errorEstimate};${sample.blockerBit};${sample.skinContactStatus};${sample.skinContactSupported};${sample.hr};"
                             Log.d(tag, log)
+                            scope.launch {
+                                recordManager.writeData("PPI", log)
+                            }
+                            dataMethodChannel.invokeMethod("onPPIDataReceived", log)
                         }
-                        dataMethodChannel.invokeMethod("onPPIDataReceived", log)
                     },
                     { error: Throwable ->
                         Log.e(tag, "Ppi stream failed. Reason $error")
